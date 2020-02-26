@@ -296,6 +296,59 @@ token available to the pod at a configurable file path, and refresh the token as
 
 The application is responsible for reloading the token when it rotates. Periodic reloading (e.g. once every 5 minutes) is sufficient for most usecases.
 
+## Service Account Issuer Discovery
+
+{{< feature-state for_k8s_version="v1.18" state="alpha" >}}
+
+{{< note >}}
+The Service Account Issuer Discovery feature is __alpha__ in 1.18 and enabled by
+setting the `ServiceAccountIssuerDiscovery` feature gate to `true` and then
+enabling the Service Account Token Projection feature as described above.
+
+Note that the issuer URL must comply with the
+[OIDC Discovery Spec](https://openid.net/specs/openid-connect-discovery-1_0.html). In
+practice, this means it must use the `https` scheme, and should serve an OpenID
+provider configuration at `{service-account-issuer}/.well-known/openid-configuration`.
+
+If the URL does not comply, the `ServiceAccountIssuerDiscovery` endpoints will
+not be registered, even if the feature is enabled.
+{{< /note >}}
+
+The Service Account Issuer Discovery feature enables federation of Kubernetes
+service account tokens issued by a cluster (the _identity provider_) with
+external systems (_relying parties_).
+
+When enabled, the Kubernetes API server will serve an OpenID Provider
+Configuration document at `/.well-known/openid-configuration` and the associated
+JSON Web Key Set (JWKS) at `/openid/v1/jwks`. The OpenID Provider Configuration
+is sometimes referred to as the _discovery document_.
+
+{{< note >}}
+The responses served at `/.well-known/openid-configuration` and
+`/openid/v1/jwks` are designed to be OIDC compatible, but not strictly OIDC
+compliant. Today they contain only the parameters necessary to perform
+validation of Kubernetes service account tokens. Additional, parameters may be
+added if it is determined that doing so improves compatibility with common
+client implementations used by relying parties.
+{{< /note >}}
+
+The JWKS contains public keys that can be used to validate the Kubernetes
+service account tokens. Relying parties first query for the OpenID Provider
+Configuration, and use the `jwks_uri` field in the response to find the JWKS.
+
+In many cases, Kubernetes API servers are not available on the public internet,
+but public endpoints that serve cached responses from the API server can be made
+available by users or service providers. In these cases, it is possible to
+override the `jwks_uri` in the OpenID Provider Configuration so that it points
+to the public endpoint, rather than the API server's address, by passing the
+`--service-account-jwks-uri` flag to the API server. Like the issuer URL, the
+JWKS URI is required to use the `https` scheme.
+
+For additional technical details, see the
+[Service Account Signing Key Retrieval KEP](https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/20190730-oidc-discovery.md)
+and
+[OIDC Discovery Spec](https://openid.net/specs/openid-connect-discovery-1_0.html).
+
 {{% /capture %}}
 
 {{% capture whatsnext %}}
